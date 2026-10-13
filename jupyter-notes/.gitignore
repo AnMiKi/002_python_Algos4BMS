@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# VS Code local state
+.vscode/*
+!.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
