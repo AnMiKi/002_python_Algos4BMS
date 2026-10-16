@@ -1,6 +1,6 @@
 ######################################################################
 ## This file is part of the Battery Model project.
-## It implements a class for the advanced self correcting cell model.
+## It implements a class for the enhanced self-correcting cell model.
 ######################################################################
 
 import numpy as np
@@ -9,22 +9,54 @@ class SCModel:
     
     '''Self Correcting Cell Model'''
 
-    def __init__(self, capacity_ah, r0):
+    def __init__(self, capacity_ah, r0, r1, tau1, gamma, m):
         # Def of initial model params
         self.capacity_ah = capacity_ah
         self.r0 = r0
+        self.r1 = r1
+        self.tau1 = tau1
+        self.gamma = gamma
+        self.m = m
 
     # TBD equation
     def f(self, x, current, dt):
-        x_next = x - (current * dt) / (3600 * self.capacity_ah)
+
+        z = x[0]
+        i_r = x[1]
+        hyst = x[2]
+
+        # Coulomb counting implentation
+        z_next = z - (current * dt) / (3600 * self.capacity_ah)
+
+        # RC polarization state
+        a = np.exp(-dt/self.tau1) 
+        i_r_next = a * i_r + (1 - a) * current 
+
+        # Hysteresis state
+        a_h = np.exp((-np.abs(self.gamma * current * dt)/(3600 * self.capacity_ah)))
+        hyst_next = a_h * hyst - (1 - a_h) * np.sign(current)
+
+        x_next = np.array([
+            z_next,
+            i_r_next,
+            hyst_next
+        ])
+
         return x_next
 
     # Simple OCV model
-    def ocv(self, x):
-        ocv = 3.0 + 1.2 * x
+    def ocv(self, soc):
+        ocv = 3.0 + 1.2 * soc
         return ocv
 
     # Output equation
     def h(self, x, current):
-        v = self.ocv(x) # - (self.r0 * current)
+
+        z = x[0]
+        i_r = x[1]
+        hyst = x[2]
+
+        v = self.ocv(z)  
+        v = v + (self.m * hyst) - (self.r0 * current) - (self.r1 * i_r)
+
         return v
