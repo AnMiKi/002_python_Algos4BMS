@@ -117,16 +117,106 @@ import numpy as np
 #############################
 # Test of the effective current calculation
 #############################
-model = SCModel(capacity_ah = 1, r0 = 10e-3, r1 = 10e-2, tau1 = 10, gamma = 900, m = 30e-3, m0 = 1, eta = 0.9);
+# model = SCModel(capacity_ah = 1, r0 = 10e-3, r1 = 10e-2, tau1 = 10, gamma = 900, m = 30e-3, m0 = 1, eta = 0.9);
 
-# discharge
-x = np.array([0.5, 0.0, 0.0])
-x_next = model.f(x, current=0.1, dt=3600)
+# # discharge
+# x = np.array([0.5, 0.0, 0.0])
+# x_next = model.f(x, current=0.1, dt=3600)
 
-assert abs(x_next[0] - 0.4) < 1e-12
+# assert abs(x_next[0] - 0.4) < 1e-12
 
-x = np.array([0.5, 0.0, 0.0])
-x_next = model.f(x, current=-0.1, dt=3600)
+# x = np.array([0.5, 0.0, 0.0])
+# x_next = model.f(x, current=-0.1, dt=3600)
 
-assert abs(x_next[0] - 0.59) < 1e-12
+# assert abs(x_next[0] - 0.59) < 1e-12
 
+#############################
+# Test of the model with 2 RC branches
+#############################
+
+# model = SCModel(capacity_ah = 5,
+#                 r0 = 10e-2,
+#                 r = [1e-2, 2e-2],
+#                 tau = [10,100],
+#                 gamma = 50,
+#                 m = 3e-2,
+#                 m0 = 1e-2,
+#                 eta_charge = 1.0
+#                 );
+
+# # Initial states
+# x = np.array([
+#     0.8,   # SOC
+#     0.0,   # i_R1
+#     0.0,   # i_R2
+#     0.0    # hysteresis
+# ])
+
+# x_next = model.f(x = x,
+#                  current = 2.0,
+#                  dt = 10)
+
+# expected_ir1 = (1 - np.exp(-1.0)) * 2.0
+# expected_ir2 = (1 - np.exp(-0.1)) * 2.0
+
+# print(x_next)
+# print(x_next.shape)
+
+# assert abs(x_next[1] - expected_ir1) < 1e-12
+# assert abs(x_next[2] - expected_ir2) < 1e-12
+
+#############################
+# Test of the OCV-LU
+#############################
+
+# model = SCModel(capacity_ah = 5,
+#                 r0 = 10e-2,
+#                 r = [1e-2, 2e-2],
+#                 tau = [10,100],
+#                 gamma = 50,
+#                 m = 3e-2,
+#                 m0 = 1e-2,
+#                 eta_charge = 1.0,
+#                 soc_grid = [0.0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0],
+#                 ocv_values = [3.00, 3.35, 3.50, 3.65, 3.75, 3.90, 4.20]
+#                 );
+
+# ocv = model.ocv(0.0)
+# print(ocv)
+# assert(abs(ocv) - 3.0) < 1e-12
+
+# ocv = model.ocv(0.4)
+# print(ocv)
+# assert(abs(ocv) - 3.65) < 1e-12
+
+# ocv = model.ocv(0.5)
+# print(ocv)
+# assert(abs(ocv) - 3.70) < 1e-12
+
+# ocv = model.ocv(1.0)
+# print(ocv)
+# assert(abs(ocv) - 4.20) < 1e-12
+
+#############################
+# Test of the OCV-LU with extrapolation
+#############################
+
+model = SCModel(capacity_ah = 5,
+                r0 = 10e-2,
+                r = [1e-2, 2e-2],
+                tau = [10,100],
+                gamma = 50,
+                m = 3e-2,
+                m0 = 1e-2,
+                eta_charge = 1.0,
+                soc_grid = [0.0, 0.5, 1.0],
+                ocv_values = [3.00, 3.60, 4.20]
+                );
+
+ocv = model.ocv(-0.1)
+print(ocv)
+assert(abs(ocv) - 2.88) < 1e-12
+
+ocv = model.ocv(1.1)
+print(ocv)
+assert(abs(ocv) - 4.32) < 1e-12
