@@ -19,7 +19,8 @@ class SCModel:
                 m0,
                 eta_charge, 
                 soc_grid,
-                ocv_values):
+                ocv0_values,
+                ocv_rel_values):
         
         # Def of initial model params
         self.capacity_ah = capacity_ah
@@ -35,9 +36,14 @@ class SCModel:
         self.soc_grid = np.asarray(soc_grid, dtype= float)
         if np.any(np.diff(self.soc_grid) <= 0):
             raise ValueError("soc_grid must be strictly increasing.")
-        self.ocv_values = np.asarray(ocv_values, dtype=float)
-        if len(self.soc_grid) != len(self.ocv_values):
-            raise ValueError("Length of soc_grid and ocv_values must be the same.")
+        if len(self.soc_grid) < 2:
+            raise ValueError("At least two OCV/SOC points are required.")
+        self.ocv0_values = np.asarray(ocv0_values, dtype=float)
+        if len(self.soc_grid) != len(self.ocv0_values):
+            raise ValueError("Length of soc_grid and ocv0_values must be the same.")
+        self.ocv_rel_values = np.asarray(ocv_rel_values, dtype=float)
+        if len(self.soc_grid) != len(self.ocv_rel_values):
+            raise ValueError("Length of soc_grid and ocv_rel_values must be the same.")
         
     # State equation
     def f(self, x, current, dt):
@@ -67,30 +73,24 @@ class SCModel:
 
         return x_next
 
-    # Simple OCV model
-    def ocv(self, soc):
+    # OCV calculation
+    def ocv(self, soc, temperature):
         
-        if soc < self.soc_grid[0]:
-        # lower extrapolation
-            m_low = (self.ocv_values[1] - self.ocv_values[0])/(self.soc_grid[1] - self.soc_grid[0])
-            ocv = self.ocv_values[0] + m_low * (soc - self.soc_grid[0])  
-        elif soc > self.soc_grid[-1]:
-        # upper extrapolation
-            m_high = (self.ocv_values[-1] - self.ocv_values[-2])/(self.soc_grid[-1] - self.soc_grid[-2])
-            ocv = self.ocv_values[-1] + m_high * (soc - self.soc_grid[-1]) 
-        else:
-        # interpolation 
-            ocv = np.interp(soc, self.soc_grid, self.ocv_values)
+        ocv0 = self._interp_extrap(soc, self.ocv0_values)
+        ocv_rel = self._interp_extrap(soc, self.ocv_rel_values)
+
+        ocv = ocv0 + temperature * ocv_rel
+
         return ocv
 
     # Output equation
-    def h(self, x, current, s):
+    def h(self, x, current, s, temperature):
 
         z = x[0]
         i_r = x[1:-1]
         hyst = x[-1]
 
-        v = self.ocv(z)  
+        v = self.ocv(z, temperature)  
         v = v + (self.m * hyst) + (self.m0 * s) - (self.r0 * current) - np.dot(self.r ,i_r)
 
         return v
@@ -110,3 +110,41 @@ class SCModel:
             return current
         else:
             return current * self.eta_charge
+
+    # Calculation of the slope of the OCV curve at a given SoC
+    def docv_dsoc(self, soc, temperature):
+        slope_ocv0 = self._slope(soc, self.ocv0_values)
+        slope_ocv_rel = self._slope(soc, self.ocv_rel_values)
+        slope = slope_ocv0 + temperature * slope_ocv_rel
+
+        return slope
+
+    def _interp_extrap(self, soc, values):
+
+        if soc < self.soc_grid[0]:
+        # lower extrapolation
+            slope_low = (values[1] - values[0])/(self.soc_grid[1] - self.soc_grid[0])
+            ocv = values[0] + slope_low * (soc - self.soc_grid[0])  
+        elif soc > self.soc_grid[-1]:
+        # upper extrapolation
+            slope_high = (values[-1] - values[-2])/(self.soc_grid[-1] - self.soc_grid[-2])
+            ocv = values[-1] + slope_high * (soc - self.soc_grid[-1]) 
+        else:
+        # interpolation 
+            ocv = np.interp(soc, self.soc_grid, values)
+        return ocv
+
+    def _slope(self, soc, values):
+        if soc <= self.soc_grid[0]:
+            # lower extrapolation
+            slope_low = (values[1] - values[0])/(self.soc_grid[1] - self.soc_grid[0])
+            return slope_low
+        elif soc >= self.soc_grid[-1]:
+            # upper extrapolation
+            slope_high = (values[-1] - values[-2])/(self.soc_grid[-1] - self.soc_grid[-2])
+            return slope_high
+        else:
+            # interpolation
+            idx = np.searchsorted(self.soc_grid, soc) - 1
+            slope = (values[idx + 1] - values[idx]) / (self.soc_grid[idx + 1] - self.soc_grid[idx])
+            return slope

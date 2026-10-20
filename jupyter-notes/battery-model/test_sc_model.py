@@ -6,6 +6,7 @@
 
 from sc_model import SCModel
 import numpy as np
+import matplotlib.pyplot as plt
 
 # #############################
 # # Test of SoC calculation
@@ -201,7 +202,74 @@ import numpy as np
 # Test of the OCV-LU with extrapolation
 #############################
 
-model = SCModel(capacity_ah = 5,
+# model = SCModel(capacity_ah = 5,
+#                 r0 = 10e-2,
+#                 r = [1e-2, 2e-2],
+#                 tau = [10,100],
+#                 gamma = 50,
+#                 m = 3e-2,
+#                 m0 = 1e-2,
+#                 eta_charge = 1.0,
+#                 soc_grid = [0.0, 0.5, 1.0],
+#                 ocv_values = [3.00, 3.60, 4.20]
+#                 );
+
+# ocv = model.ocv(-0.1)
+# print(ocv)
+# assert(abs(ocv) - 2.88) < 1e-12
+
+# ocv = model.ocv(1.1)
+# print(ocv)
+# assert(abs(ocv) - 4.32) < 1e-12
+
+#############################
+# Test of the slope calculation of the OCV-curve
+#############################
+
+# model = SCModel(capacity_ah = 5,
+#                 r0 = 10e-2,
+#                 r = [1e-2, 2e-2],
+#                 tau = [10,100],
+#                 gamma = 50,
+#                 m = 3e-2,
+#                 m0 = 1e-2,
+#                 eta_charge = 1.0,
+#                 soc_grid = [0.0, 0.2, 0.6, 1.0],
+#                 ocv_values = [3.0, 3.4, 3.6, 4.2]
+#                 );
+
+# m = model.docv_dsoc(0.1)
+# print(m)
+# assert(abs(m) - 2.0) < 1e-12
+
+# m = model.dsoc_docv(0.4)
+# print(m)
+# assert(abs(m) - 0.5) < 1e-12
+
+# m = model.dsoc_docv(0.8)
+# print(m)
+# assert(abs(m) - 1.5) < 1e-12
+
+# m = model.dsoc_docv(-0.1)
+# print(m)
+# assert(abs(m) - 2.0) < 1e-12
+
+# m = model.dsoc_docv(1.1)
+# print(m)
+# assert(abs(m) - 1.5) < 1e-12
+
+# soc_grid = [0.0, 0.2, 0.6, 1.0]
+# ocv_values = [3.0, 3.4, 3.6, 4.2]
+
+# plt.figure()
+# plt.plot(soc_grid, ocv_values)
+# plt.show()
+
+#############################
+# Test of the calculation of the temperature dependent slope of the OCV-curve
+#############################
+
+model  = SCModel(capacity_ah = 5,
                 r0 = 10e-2,
                 r = [1e-2, 2e-2],
                 tau = [10,100],
@@ -210,13 +278,11 @@ model = SCModel(capacity_ah = 5,
                 m0 = 1e-2,
                 eta_charge = 1.0,
                 soc_grid = [0.0, 0.5, 1.0],
-                ocv_values = [3.00, 3.60, 4.20]
+                ocv0_values = [3.0, 3.6, 4.2],
+                ocv_rel_values = [0.0001, 0.0002, 0.0004]
                 );
 
-ocv = model.ocv(-0.1)
-print(ocv)
-assert(abs(ocv) - 2.88) < 1e-12
+slopeT25 = model.docv_dsoc(0.25, 25)
+print(slopeT25)
 
-ocv = model.ocv(1.1)
-print(ocv)
-assert(abs(ocv) - 4.32) < 1e-12
+assert(abs(slopeT25) - 1.205) < 1e-12
