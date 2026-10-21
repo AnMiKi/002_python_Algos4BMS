@@ -20,7 +20,8 @@ class SCModel:
                 eta_charge, 
                 soc_grid,
                 ocv0_values,
-                ocv_rel_values):
+                ocv_rel_values,
+                temperature_grid):
         
         # Def of initial model params
         self.capacity_ah = capacity_ah
@@ -44,6 +45,9 @@ class SCModel:
         self.ocv_rel_values = np.asarray(ocv_rel_values, dtype=float)
         if len(self.soc_grid) != len(self.ocv_rel_values):
             raise ValueError("Length of soc_grid and ocv_rel_values must be the same.")
+        self.temperature_grid = np.asarray(temperature_grid, dtype=float)
+        if np.any(np.diff(self.temperature_grid) <= 0):
+            raise ValueError("temperature_grid must be strictly increasing.")
         
     # State equation
     def f(self, x, current, dt):
@@ -148,3 +152,15 @@ class SCModel:
             idx = np.searchsorted(self.soc_grid, soc) - 1
             slope = (values[idx + 1] - values[idx]) / (self.soc_grid[idx + 1] - self.soc_grid[idx])
             return slope
+
+    def _interp_temperature(self, temperature, values):
+        # Temperatur begrenzen auf min oder max der Temperaturwerte
+        temperature_clamped =np.clip(temperature,
+                                     self.temperature_grid[0],
+                                     self.temperature_grid[-1])
+        value = np.interp(temperature_clamped,
+                          self.temperature_grid,
+                          values)
+
+        return value
+        

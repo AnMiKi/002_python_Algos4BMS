@@ -269,6 +269,28 @@ import matplotlib.pyplot as plt
 # Test of the calculation of the temperature dependent slope of the OCV-curve
 #############################
 
+# model  = SCModel(capacity_ah = 5,
+#                 r0 = 10e-2,
+#                 r = [1e-2, 2e-2],
+#                 tau = [10,100],
+#                 gamma = 50,
+#                 m = 3e-2,
+#                 m0 = 1e-2,
+#                 eta_charge = 1.0,
+#                 soc_grid = [0.0, 0.5, 1.0],
+#                 ocv0_values = [3.0, 3.6, 4.2],
+#                 ocv_rel_values = [0.0001, 0.0002, 0.0004]
+#                 );
+
+# slopeT25 = model.docv_dsoc(0.25, 25)
+# print(slopeT25)
+
+# assert(abs(slopeT25) - 1.205) < 1e-12
+
+#############################
+# Test of the temperature interpolation
+#############################
+
 model  = SCModel(capacity_ah = 5,
                 r0 = 10e-2,
                 r = [1e-2, 2e-2],
@@ -279,10 +301,25 @@ model  = SCModel(capacity_ah = 5,
                 eta_charge = 1.0,
                 soc_grid = [0.0, 0.5, 1.0],
                 ocv0_values = [3.0, 3.6, 4.2],
-                ocv_rel_values = [0.0001, 0.0002, 0.0004]
-                );
+                ocv_rel_values = [0.0001, 0.0002, 0.0004],
+                temperature_grid = [0.0, 25.0, 45.0],
+                )
 
-slopeT25 = model.docv_dsoc(0.25, 25)
-print(slopeT25)
+r0_values = [0.018, 0.010, 0.008]
 
-assert(abs(slopeT25) - 1.205) < 1e-12
+r0_25 = model._interp_temperature(25.0, r0_values)
+print(r0_25)
+assert(abs(r0_25) - 0.01) < 1e-12
+
+r0_12p5 = model._interp_temperature(12.5, r0_values)
+print(r0_12p5)
+assert(abs(r0_12p5) - 0.014) < 1e-12
+
+
+r0_neg20 = model._interp_temperature(-20.0, r0_values)
+print(r0_neg20)
+assert(abs(r0_neg20) - 0.018) < 1e-12
+
+r0_80 = model._interp_temperature(80.0, r0_values)
+print(r0_80)
+assert(abs(r0_80) - 0.008) < 1e-12
