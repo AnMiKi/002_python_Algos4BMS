@@ -11,9 +11,9 @@ class SCModel:
 
     def __init__(self,
                 capacity_ah,
-                r0,
-                r,
-                tau,
+                r0_values,
+                r_values,
+                tau_values,
                 gamma,
                 m,
                 m0,
@@ -25,11 +25,18 @@ class SCModel:
         
         # Def of initial model params
         self.capacity_ah = capacity_ah
-        self.r0 = r0
-        self.r = np.asarray(r, dtype=float)
-        self.tau = np.asarray(tau, dtype=float)
-        if len(self.r) != len(self.tau):
-            raise ValueError("Length of r and tau must be the same.")
+        self.temperature_grid = np.asarray(temperature_grid, dtype=float)
+        if np.any(np.diff(self.temperature_grid) <= 0):
+            raise ValueError("temperature_grid must be strictly increasing.")
+        self.r0_values = np.asarray(r0_values, dtype=float)
+        if len(self.temperature_grid) != len(self.r0_values):
+            raise ValueError("Length of temperature_grid and r0_values must be the same.")
+        self.r_values = np.asarray(r_values, dtype=float)
+        self.tau_values = np.asarray(tau_values, dtype=float)
+        if self.r_values.shape != self.tau_values.shape:
+             raise ValueError("r_values and tau_values must have the same shape.")
+        if self.tau_values.ndim != 2:
+            raise ValueError("tau_values must be a 2D array with one row per temperature.")
         self.gamma = gamma
         self.m = m
         self.m0 = m0
@@ -45,12 +52,14 @@ class SCModel:
         self.ocv_rel_values = np.asarray(ocv_rel_values, dtype=float)
         if len(self.soc_grid) != len(self.ocv_rel_values):
             raise ValueError("Length of soc_grid and ocv_rel_values must be the same.")
-        self.temperature_grid = np.asarray(temperature_grid, dtype=float)
-        if np.any(np.diff(self.temperature_grid) <= 0):
-            raise ValueError("temperature_grid must be strictly increasing.")
         
     # State equation
-    def f(self, x, current, dt):
+    def f(self, x, current, dt, temperature):
+
+        x = self._validate_state(x)  # Validate the state vector
+
+        # Temperaturabhängige Parameter bestimmen
+        tau = self._interp_temperature_vector(temperature, self.tau_values)
 
         z = x[0] # SoC
         i_r = x[1:-1] # RC currents 
@@ -62,7 +71,7 @@ class SCModel:
         z_next = z - (i_eff * dt) / (3600 * self.capacity_ah)
 
         # 2. RC polarization state
-        a = np.exp(-dt/self.tau) 
+        a = np.exp(-dt/tau) 
         i_r_next = a * i_r + (1 - a) * i_eff 
 
         # 3. Dynamic hysteresis state
@@ -90,12 +99,20 @@ class SCModel:
     # Output equation
     def h(self, x, current, s, temperature):
 
+        x = self._validate_state(x)  # Validate the state vector
+
         z = x[0]
         i_r = x[1:-1]
         hyst = x[-1]
 
+        # Temperaturabhängiger Innenwiderstand
+        r0  = self._interp_temperature(temperature, self.r0_values)
+
+        # Temperaturabhängiger RC-Widerstand
+        r = self._interp_temperature_vector(temperature, self.r_values)
+
         v = self.ocv(z, temperature)  
-        v = v + (self.m * hyst) + (self.m0 * s) - (self.r0 * current) - np.dot(self.r ,i_r)
+        v = v + (self.m * hyst) + (self.m0 * s) - (r0 * current) - np.dot(r ,i_r)
 
         return v
 
@@ -163,4 +180,32 @@ class SCModel:
                           values)
 
         return value
-        
+
+    # Interpolation of a vector of values based on temperature
+    def _interp_temperature_vector(self, temperature, values):
+        temperature_clamped =np.clip(temperature,
+                                     self.temperature_grid[0],
+                                     self.temperature_grid[-1])
+
+        n_rc = values.shape[1] # Number of RC elements
+        result = np.zeros(n_rc) # Initialize result array
+        for j in range(n_rc):
+            result[j] = np.interp(
+            temperature_clamped,
+            self.temperature_grid,
+            values[:, j])
+        return result # Return the interpolated values
+
+    def _validate_state(self, x):
+
+        x = np.asarray(x, dtype=float) # Ensure x is a numpy array of floats
+
+        n_rc = self.r_values.shape[1] # Number of RC elements
+        expected_length = 1 + n_rc + 1 # SOC + RC currents + dynamic hysteresis
+
+        if x.ndim != 1:
+            raise ValueError(f"State vector x must be a 1D array of length {expected_length}.")
+        if len(x) != expected_length:
+            raise ValueError(f"State vector x must have length {expected_length}, but got length {len(x)}.")
+
+        return x

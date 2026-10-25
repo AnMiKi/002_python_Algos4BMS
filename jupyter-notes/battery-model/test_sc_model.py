@@ -291,10 +291,51 @@ import matplotlib.pyplot as plt
 # Test of the temperature interpolation
 #############################
 
+# model  = SCModel(capacity_ah = 5,
+#                 r0 = 10e-2,
+#                 r = [1e-2, 2e-2],
+#                 tau = [10,100],
+#                 gamma = 50,
+#                 m = 3e-2,
+#                 m0 = 1e-2,
+#                 eta_charge = 1.0,
+#                 soc_grid = [0.0, 0.5, 1.0],
+#                 ocv0_values = [3.0, 3.6, 4.2],
+#                 ocv_rel_values = [0.0001, 0.0002, 0.0004],
+#                 temperature_grid = [0.0, 25.0, 45.0],
+#                 )
+
+# r0_values = [0.018, 0.010, 0.008]
+
+# r0_25 = model._interp_temperature(25.0, r0_values)
+# print(r0_25)
+# assert(abs(r0_25) - 0.01) < 1e-12
+
+# r0_12p5 = model._interp_temperature(12.5, r0_values)
+# print(r0_12p5)
+# assert(abs(r0_12p5) - 0.014) < 1e-12
+
+
+# r0_neg20 = model._interp_temperature(-20.0, r0_values)
+# print(r0_neg20)
+# assert(abs(r0_neg20) - 0.018) < 1e-12
+
+# r0_80 = model._interp_temperature(80.0, r0_values)
+# print(r0_80)
+# assert(abs(r0_80) - 0.008) < 1e-12
+
+#############################
+# Test of the intrpolated values of the RC-branch parameters
+#############################
+
 model  = SCModel(capacity_ah = 5,
-                r0 = 10e-2,
-                r = [1e-2, 2e-2],
-                tau = [10,100],
+                r0_values = [0.018, 0.010, 0.008],
+                r_values =  np.array([
+                            [2e-2, 3e-2], # values for temperature 0.0
+                            [1e-2, 2e-2], # values for temperature 25.0
+                            [8e-3, 1.5e-2] # values for temperature 45.0
+                            ]),
+                tau_values = [10,100],
                 gamma = 50,
                 m = 3e-2,
                 m0 = 1e-2,
@@ -305,21 +346,17 @@ model  = SCModel(capacity_ah = 5,
                 temperature_grid = [0.0, 25.0, 45.0],
                 )
 
-r0_values = [0.018, 0.010, 0.008]
+r = model._interp_temperature_vetor(12.5, model.r_values)
+print(r)
+expected = np.array([0.015, 0.025])
+assert np.allclose(r, expected)
 
-r0_25 = model._interp_temperature(25.0, r0_values)
-print(r0_25)
-assert(abs(r0_25) - 0.01) < 1e-12
+r = model._interp_temperature_vetor(25, model.r_values)
+print(r)
+expected = np.array([0.010, 0.020])
+assert np.allclose(r, expected)
 
-r0_12p5 = model._interp_temperature(12.5, r0_values)
-print(r0_12p5)
-assert(abs(r0_12p5) - 0.014) < 1e-12
-
-
-r0_neg20 = model._interp_temperature(-20.0, r0_values)
-print(r0_neg20)
-assert(abs(r0_neg20) - 0.018) < 1e-12
-
-r0_80 = model._interp_temperature(80.0, r0_values)
-print(r0_80)
-assert(abs(r0_80) - 0.008) < 1e-12
+r = model._interp_temperature_vetor(-20, model.r_values)
+print(r)
+expected = np.array([0.020, 0.030])
+assert np.allclose(r, expected)
