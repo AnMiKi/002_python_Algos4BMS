@@ -10,7 +10,7 @@ class SCModel:
     '''Self Correcting Cell Model'''
 
     def __init__(self,
-                capacity_ah,
+                capacity_values,
                 r0_values,
                 r_values,
                 tau_values,
@@ -24,7 +24,12 @@ class SCModel:
                 temperature_grid):
         
         # Def of initial model params
-        self.capacity_ah = capacity_ah
+        self.temperature_grid = np.asarray(temperature_grid, dtype=float)
+        self.capacity_values = np.asarray(capacity_values, dtype=float)
+        if self.capacity_values.ndim != 1:
+            raise ValueError("capacity_values must be a 1D array.")
+        if len(self.capacity_values) != len(temperature_grid):
+            raise ValueError("Length of capacity_values and temperature_grid must be the same.")
         self.temperature_grid = np.asarray(temperature_grid, dtype=float)
         if np.any(np.diff(self.temperature_grid) <= 0):
             raise ValueError("temperature_grid must be strictly increasing.")
@@ -32,11 +37,17 @@ class SCModel:
         if len(self.temperature_grid) != len(self.r0_values):
             raise ValueError("Length of temperature_grid and r0_values must be the same.")
         self.r_values = np.asarray(r_values, dtype=float)
+        if self.r_values.ndim != 2:
+            raise ValueError("r_values must be a 2D array with one row per temperature.")
         self.tau_values = np.asarray(tau_values, dtype=float)
+        if self.tau_values.ndim != 2:
+            raise ValueError("tau_values must be a 2D array with one row per temperature.")
         if self.r_values.shape != self.tau_values.shape:
              raise ValueError("r_values and tau_values must have the same shape.")
         if self.tau_values.ndim != 2:
             raise ValueError("tau_values must be a 2D array with one row per temperature.")
+        if self.r_values.shape[0] != len(self.temperature_grid):
+            raise ValueError("Number of temperature rows in r_values and tau_values must match temperature_grid.")
         self.gamma = gamma
         self.m = m
         self.m0 = m0
@@ -56,6 +67,8 @@ class SCModel:
     # State equation
     def f(self, x, current, dt, temperature):
 
+        capacity_ah = self._interp_temperature(temperature, self.capacity_values) # Interpolate capacity based on temperature
+
         x = self._validate_state(x)  # Validate the state vector
 
         # Temperaturabhängige Parameter bestimmen
@@ -68,14 +81,14 @@ class SCModel:
         i_eff = self.effective_current(current)
 
         # 1. SOC state: Coulomb counting
-        z_next = z - (i_eff * dt) / (3600 * self.capacity_ah)
+        z_next = z - (i_eff * dt) / (3600 * capacity_ah)
 
         # 2. RC polarization state
         a = np.exp(-dt/tau) 
         i_r_next = a * i_r + (1 - a) * i_eff 
 
         # 3. Dynamic hysteresis state
-        a_h = np.exp((-np.abs(self.gamma * i_eff * dt)/(3600 * self.capacity_ah)))
+        a_h = np.exp((-np.abs(self.gamma * i_eff * dt)/(3600 * capacity_ah)))
         hyst_next = a_h * hyst - (1 - a_h) * np.sign(current)
 
         x_next = np.concatenate((
@@ -117,11 +130,13 @@ class SCModel:
         return v
 
     # instante Hysterese
-    def update_sign_state(self, current, s_prev):
+    def update_sign_state(self, current, s_prev, temperature):
+
+        capacity_ah = self._interp_temperature(temperature, self.capacity_values) # Interpolate capacity based on temperature
 
         s = np.sign(current)
 
-        if np.abs(current) < self.capacity_ah / 100:
+        if np.abs(current) < capacity_ah / 100:
             s = s_prev
         return s
 

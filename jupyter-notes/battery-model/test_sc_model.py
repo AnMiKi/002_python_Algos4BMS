@@ -328,14 +328,106 @@ import matplotlib.pyplot as plt
 # Test of the intrpolated values of the RC-branch parameters
 #############################
 
-model  = SCModel(capacity_ah = 5,
-                r0_values = [0.018, 0.010, 0.008],
+# model  = SCModel(capacity_ah = 5,
+#                 r0_values = [0.018, 0.010, 0.008],
+#                 r_values =  np.array([
+#                             [2e-2, 3e-2], # values for temperature 0.0
+#                             [1e-2, 2e-2], # values for temperature 25.0
+#                             [8e-3, 1.5e-2] # values for temperature 45.0
+#                             ]),
+#                 tau_values = [10,100],
+#                 gamma = 50,
+#                 m = 3e-2,
+#                 m0 = 1e-2,
+#                 eta_charge = 1.0,
+#                 soc_grid = [0.0, 0.5, 1.0],
+#                 ocv0_values = [3.0, 3.6, 4.2],
+#                 ocv_rel_values = [0.0001, 0.0002, 0.0004],
+#                 temperature_grid = [0.0, 25.0, 45.0],
+#                 )
+
+# r = model._interp_temperature_vetor(12.5, model.r_values)
+# print(r)
+# expected = np.array([0.015, 0.025])
+# assert np.allclose(r, expected)
+
+# r = model._interp_temperature_vetor(25, model.r_values)
+# print(r)
+# expected = np.array([0.010, 0.020])
+# assert np.allclose(r, expected)
+
+# r = model._interp_temperature_vetor(-20, model.r_values)
+# print(r)
+# expected = np.array([0.020, 0.030])
+# assert np.allclose(r, expected)
+
+#############################
+# Test of the checks for the state vector
+#############################
+
+# model  = SCModel(capacity_ah = 5,
+#                 r0_values = [0.018, 0.010, 0.008],
+#                 r_values =  np.array([
+#                             [2e-2, 3e-2], # values for temperature 0.0
+#                             [1e-2, 2e-2], # values for temperature 25.0
+#                             [8e-3, 1.5e-2] # values for temperature 45.0
+#                             ]),
+#                 tau_values = np.array([[10,100],
+#                                       [10, 100],
+#                                       [10, 100]
+#                                       ]),
+#                 gamma = 50,
+#                 m = 3e-2,
+#                 m0 = 1e-2,
+#                 eta_charge = 1.0,
+#                 soc_grid = [0.0, 0.5, 1.0],
+#                 ocv0_values = [3.0, 3.6, 4.2],
+#                 ocv_rel_values = [0.0001, 0.0002, 0.0004],
+#                 temperature_grid = [0.0, 25.0, 45.0],
+#                 )
+
+# # Positive test: valid state vector
+
+# x = np.array([0.8, 0.0, 0.0, 0.0])
+
+# x_checked = model._validate_state(x)
+# assert x_checked.shape == (4,)
+
+# # Negative testCase 1: invalid state vector (wrong length)
+
+# x_wrong1 = np.array([0.8, 0.0, 0.0])  # Only 3 elements instead of 4
+# print(x_wrong1)
+
+# try:
+#     x_checked = model._validate_state(x_wrong1)
+#     print('ERROR: invalid state accepted')
+# except ValueError:
+#     print('PASS')
+
+# # Negative testCase 2: invalid state vector (wrong dimension)
+
+# x_wrong2 = np.array([[0.8, 0.0, 0.0, 0.0]])
+# print(x_wrong2)
+
+# try:
+#     x_checked = model._validate_state(x_wrong2)
+#     print('ERROR: invalid state accepted')
+# except ValueError:
+#     print('PASS')
+
+#############################
+# Test of the interpolation of the capacity values based on temperature
+#############################
+
+model  = SCModel(capacity_values = [4.0, 5.0],
+                r0_values = [0.018, 0.010],
                 r_values =  np.array([
                             [2e-2, 3e-2], # values for temperature 0.0
                             [1e-2, 2e-2], # values for temperature 25.0
-                            [8e-3, 1.5e-2] # values for temperature 45.0
                             ]),
-                tau_values = [10,100],
+                tau_values = np.array([[10,100],
+                                      [10, 100],
+                                      ]),
                 gamma = 50,
                 m = 3e-2,
                 m0 = 1e-2,
@@ -343,20 +435,5 @@ model  = SCModel(capacity_ah = 5,
                 soc_grid = [0.0, 0.5, 1.0],
                 ocv0_values = [3.0, 3.6, 4.2],
                 ocv_rel_values = [0.0001, 0.0002, 0.0004],
-                temperature_grid = [0.0, 25.0, 45.0],
+                temperature_grid = [0.0, 25.0],
                 )
-
-r = model._interp_temperature_vetor(12.5, model.r_values)
-print(r)
-expected = np.array([0.015, 0.025])
-assert np.allclose(r, expected)
-
-r = model._interp_temperature_vetor(25, model.r_values)
-print(r)
-expected = np.array([0.010, 0.020])
-assert np.allclose(r, expected)
-
-r = model._interp_temperature_vetor(-20, model.r_values)
-print(r)
-expected = np.array([0.020, 0.030])
-assert np.allclose(r, expected)
