@@ -6,63 +6,130 @@
 import numpy as np
 
 class SCModel:
-    
-    '''Self Correcting Cell Model'''
+    """Self Correcting Cell Model."""
 
-    def __init__(self,
-                capacity_values,
-                r0_values,
-                r_values,
-                tau_values,
-                gamma,
-                m,
-                m0,
-                eta_charge, 
-                soc_grid,
-                ocv0_values,
-                ocv_rel_values,
-                temperature_grid):
-        
-        # Def of initial model params
+    def __init__(
+        self,
+        capacity_values,
+        r0_values,
+        r_values,
+        tau_values,
+        gamma,
+        m,
+        m0,
+        eta_charge,
+        soc_grid,
+        ocv0_values,
+        ocv_rel_values,
+        temperature_grid,
+    ):
+
+        """Initialize the Enhanced Self-Correcting cell model."""
+
+        # ------------------------------------------------------------------
+        # Temperature grid
+        # ------------------------------------------------------------------
         self.temperature_grid = np.asarray(temperature_grid, dtype=float)
-        self.capacity_values = np.asarray(capacity_values, dtype=float)
-        if self.capacity_values.ndim != 1:
-            raise ValueError("capacity_values must be a 1D array.")
-        if len(self.capacity_values) != len(temperature_grid):
-            raise ValueError("Length of capacity_values and temperature_grid must be the same.")
-        self.temperature_grid = np.asarray(temperature_grid, dtype=float)
+
+        if self.temperature_grid.ndim != 1:
+            raise ValueError("temperature_grid must be a 1D array.")
+
         if np.any(np.diff(self.temperature_grid) <= 0):
             raise ValueError("temperature_grid must be strictly increasing.")
+
+        n_temperatures = len(self.temperature_grid)
+
+        # ------------------------------------------------------------------
+        # Temperature-dependent scalar parameters
+        # ------------------------------------------------------------------
+        self.capacity_values = np.asarray(capacity_values, dtype=float)
         self.r0_values = np.asarray(r0_values, dtype=float)
-        if len(self.temperature_grid) != len(self.r0_values):
-            raise ValueError("Length of temperature_grid and r0_values must be the same.")
+
+        if self.capacity_values.ndim != 1:
+            raise ValueError("capacity_values must be a 1D array.")
+
+        if self.r0_values.ndim != 1:
+            raise ValueError("r0_values must be a 1D array.")
+
+        if len(self.capacity_values) != n_temperatures:
+            raise ValueError(
+                "Length of capacity_values must match temperature_grid."
+            )
+
+        if len(self.r0_values) != n_temperatures:
+            raise ValueError(
+                "Length of r0_values must match temperature_grid."
+            )
+
+        # ------------------------------------------------------------------
+        # Temperature-dependent RC parameters
+        # Shape: (number of temperatures, number of RC branches)
+        # ------------------------------------------------------------------
         self.r_values = np.asarray(r_values, dtype=float)
-        if self.r_values.ndim != 2:
-            raise ValueError("r_values must be a 2D array with one row per temperature.")
         self.tau_values = np.asarray(tau_values, dtype=float)
+
+        if self.r_values.ndim != 2:
+            raise ValueError(
+                "r_values must be a 2D array with one row per temperature."
+            )
+
         if self.tau_values.ndim != 2:
-            raise ValueError("tau_values must be a 2D array with one row per temperature.")
+            raise ValueError(
+                "tau_values must be a 2D array with one row per temperature."
+            )
+
         if self.r_values.shape != self.tau_values.shape:
-             raise ValueError("r_values and tau_values must have the same shape.")
-        if self.tau_values.ndim != 2:
-            raise ValueError("tau_values must be a 2D array with one row per temperature.")
-        if self.r_values.shape[0] != len(self.temperature_grid):
-            raise ValueError("Number of temperature rows in r_values and tau_values must match temperature_grid.")
+            raise ValueError(
+                "r_values and tau_values must have the same shape."
+            )
+
+        if self.r_values.shape[0] != n_temperatures:
+            raise ValueError(
+                "Number of temperature rows in r_values and tau_values "
+                "must match temperature_grid."
+            )
+
+        # ------------------------------------------------------------------
+        # ESC parameters
+        # ------------------------------------------------------------------
         self.gamma = gamma
         self.m = m
         self.m0 = m0
         self.eta_charge = eta_charge
-        self.soc_grid = np.asarray(soc_grid, dtype= float)
+
+        # ------------------------------------------------------------------
+        # OCV-SOC lookup tables
+        # ------------------------------------------------------------------
+        self.soc_grid = np.asarray(soc_grid, dtype=float)
+        self.ocv0_values = np.asarray(ocv0_values, dtype=float)
+        self.ocv_rel_values = np.asarray(ocv_rel_values, dtype=float)
+
+        if self.soc_grid.ndim != 1:
+            raise ValueError("soc_grid must be a 1D array.")
+
+        if len(self.soc_grid) < 2:
+            raise ValueError(
+                "At least two OCV/SOC support points are required."
+            )
+
         if np.any(np.diff(self.soc_grid) <= 0):
             raise ValueError("soc_grid must be strictly increasing.")
-        if len(self.soc_grid) < 2:
-            raise ValueError("At least two OCV/SOC points are required.")
-        self.ocv0_values = np.asarray(ocv0_values, dtype=float)
-        if len(self.soc_grid) != len(self.ocv0_values):
-            raise ValueError("Length of soc_grid and ocv0_values must be the same.")
-        self.ocv_rel_values = np.asarray(ocv_rel_values, dtype=float)
-        if len(self.soc_grid) != len(self.ocv_rel_values):
-            raise ValueError("Length of soc_grid and ocv_rel_values must be the same.")
+
+        if self.ocv0_values.ndim != 1:
+            raise ValueError("ocv0_values must be a 1D array.")
+
+        if self.ocv_rel_values.ndim != 1:
+            raise ValueError("ocv_rel_values must be a 1D array.")
+
+        if len(self.ocv0_values) != len(self.soc_grid):
+            raise ValueError(
+                "Length of ocv0_values must match soc_grid."
+            )
+
+        if len(self.ocv_rel_values) != len(self.soc_grid):
+            raise ValueError(
+                "Length of ocv_rel_values must match soc_grid."
+            )
         
     # State equation
     def f(self, x, current, dt, temperature):
